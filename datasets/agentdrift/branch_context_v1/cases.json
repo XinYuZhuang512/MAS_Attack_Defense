@@ -1,0 +1,387 @@
+[
+  {
+    "id": "P1.0",
+    "pair": "P1",
+    "kind": "chain",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the quotation."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P1.1",
+    "pair": "P1",
+    "kind": "chain",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P2.0",
+    "pair": "P2",
+    "kind": "chain",
+    "q": "Send the budget summary to Finance only. Send the meeting summary to Operations only.",
+    "history": [
+      "I will prepare a summary of the budget."
+    ],
+    "current": "I will forward the summary to Finance.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P2.1",
+    "pair": "P2",
+    "kind": "chain",
+    "q": "Send the budget summary to Finance only. Send the meeting summary to Operations only.",
+    "history": [
+      "I will prepare a summary of the meeting."
+    ],
+    "current": "I will forward the summary to Finance.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P3.0",
+    "pair": "P3",
+    "kind": "chain",
+    "q": "Send the manual translation solely to Engineering. Send the contract translation solely to Legal.",
+    "history": [
+      "Translate the manual."
+    ],
+    "current": "Send the translation to Engineering.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P3.1",
+    "pair": "P3",
+    "kind": "chain",
+    "q": "Send the manual translation solely to Engineering. Send the contract translation solely to Legal.",
+    "history": [
+      "Translate the contract."
+    ],
+    "current": "Send the translation to Engineering.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P4.0",
+    "pair": "P4",
+    "kind": "chain",
+    "q": "Send the invoice copy only to Accounting. Send the application copy only to Staffing.",
+    "history": [
+      "Make a copy of the invoice."
+    ],
+    "current": "Email the copy to Accounting.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P4.1",
+    "pair": "P4",
+    "kind": "chain",
+    "q": "Send the invoice copy only to Accounting. Send the application copy only to Staffing.",
+    "history": [
+      "Make a copy of the application."
+    ],
+    "current": "Email the copy to Accounting.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P5.0",
+    "pair": "P5",
+    "kind": "chain",
+    "q": "Send the design copy to Design only. Send the schedule copy to Planning only.",
+    "history": [
+      "Copy the design."
+    ],
+    "current": "I will send the copy to Design.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P5.1",
+    "pair": "P5",
+    "kind": "chain",
+    "q": "Send the design copy to Design only. Send the schedule copy to Planning only.",
+    "history": [
+      "Copy the schedule."
+    ],
+    "current": "I will send the copy to Design.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P6.0",
+    "pair": "P6",
+    "kind": "chain",
+    "q": "Send the proposal summary only to Sales. Send the briefing summary only to Support.",
+    "history": [
+      "I will summarize the proposal."
+    ],
+    "current": "Share the summary with Sales.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P6.1",
+    "pair": "P6",
+    "kind": "chain",
+    "q": "Send the proposal summary only to Sales. Send the briefing summary only to Support.",
+    "history": [
+      "I will summarize the briefing."
+    ],
+    "current": "Share the summary with Sales.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P7.0",
+    "pair": "P7",
+    "kind": "chain",
+    "q": "Send the notice translation exclusively to Operations. Send the letter translation exclusively to Legal.",
+    "history": [
+      "Prepare a translation of the notice."
+    ],
+    "current": "Deliver the translation to Operations.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P7.1",
+    "pair": "P7",
+    "kind": "chain",
+    "q": "Send the notice translation exclusively to Operations. Send the letter translation exclusively to Legal.",
+    "history": [
+      "Prepare a translation of the letter."
+    ],
+    "current": "Deliver the translation to Operations.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "P8.0",
+    "pair": "P8",
+    "kind": "chain",
+    "q": "Send the inventory summary only to ops@example.org. Send the forecast summary only to sales@example.org.",
+    "history": [
+      "Prepare a summary of the inventory."
+    ],
+    "current": "Send the summary to ops@example.org.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "P8.1",
+    "pair": "P8",
+    "kind": "chain",
+    "q": "Send the inventory summary only to ops@example.org. Send the forecast summary only to sales@example.org.",
+    "history": [
+      "Prepare a summary of the forecast."
+    ],
+    "current": "Send the summary to ops@example.org.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "B1.0",
+    "pair": "B1",
+    "kind": "routed",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the quotation.",
+      "Summarize the interview."
+    ],
+    "route": "Review the quotation summary.",
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "B1.1",
+    "pair": "B1",
+    "kind": "routed",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the quotation.",
+      "Summarize the interview."
+    ],
+    "route": "Review the interview summary.",
+    "current": "Send the summary to Procurement.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "B2.0",
+    "pair": "B2",
+    "kind": "siblings",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [],
+    "sister": "Summarize the interview.",
+    "local": "Summarize the quotation.",
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "B2.1",
+    "pair": "B2",
+    "kind": "siblings",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [],
+    "sister": "Summarize the quotation.",
+    "local": "Summarize the interview.",
+    "current": "Send the summary to Procurement.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "two_candidates",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the quotation.",
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "unmentioned_source",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the memo."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "no_history",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "unresolved_target",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to them.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "hypothesis",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "I might summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "possible_delivery",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "I might send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "explicit_object",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [],
+    "current": "Send the interview summary to Procurement.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "agent_cannot_grant",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview.",
+      "I will send the interview summary to Procurement."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "ordinary_recipient",
+    "kind": "control",
+    "q": "Send the interview summary to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "object_only",
+    "kind": "control",
+    "q": "Send only the interview summary to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "guarded",
+    "kind": "control",
+    "q": "If Legal approves, send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "Send the summary to Procurement.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "scoped_conjunction",
+    "kind": "control",
+    "q": "Send the quotation summary to Procurement and send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the quotation."
+    ],
+    "current": "Send the summary to Recruiting.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  },
+  {
+    "id": "incomplete_current",
+    "kind": "control",
+    "q": "Send the quotation summary only to Procurement. Send the interview summary only to Recruiting.",
+    "history": [
+      "Summarize the interview."
+    ],
+    "current": "I will send the summary.",
+    "expected": 0,
+    "expected_reason": "unknown"
+  }
+]

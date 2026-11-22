@@ -34,7 +34,7 @@
     "path": "data/dataset_stats.json",
     "url": "https://raw.githubusercontent.com/Asif-0209/AgentDrift/014a514fa998b4ac4519579fceb8a5884b379bda/data/dataset_stats.json",
     "revision": "014a514fa998b4ac4519579fceb8a5884b379bda",
-    "local_path": "data/dataset_stats.json",
+    "local_path": "../../../datasets/agentdrift/data/dataset_stats.json",
     "bytes": 2065,
     "sha256": "798a69e3f7850d4d30386c9d4a59bbd594a47b32552bed0f83b1988e01c933e5",
     "status": "downloaded"
@@ -44,7 +44,7 @@
     "path": "data/test.jsonl",
     "url": "https://raw.githubusercontent.com/Asif-0209/AgentDrift/014a514fa998b4ac4519579fceb8a5884b379bda/data/test.jsonl",
     "revision": "014a514fa998b4ac4519579fceb8a5884b379bda",
-    "local_path": "data/test.jsonl",
+    "local_path": "../../../datasets/agentdrift/data/test.jsonl",
     "bytes": 4860307,
     "sha256": "29171469b6f45c54aa096e0a0961a1aac70268289f2016de4614fe885ebfa5d0",
     "status": "downloaded"
@@ -54,7 +54,7 @@
     "path": "data/train.jsonl",
     "url": "https://raw.githubusercontent.com/Asif-0209/AgentDrift/014a514fa998b4ac4519579fceb8a5884b379bda/data/train.jsonl",
     "revision": "014a514fa998b4ac4519579fceb8a5884b379bda",
-    "local_path": "data/train.jsonl",
+    "local_path": "../../../datasets/agentdrift/data/train.jsonl",
     "bytes": 22817711,
     "sha256": "7ba9c1b2b5364d46dd7b6496370ef8ce338112b3de61f025cacb8988031d0535",
     "status": "downloaded"
@@ -64,7 +64,7 @@
     "path": "data/val.jsonl",
     "url": "https://raw.githubusercontent.com/Asif-0209/AgentDrift/014a514fa998b4ac4519579fceb8a5884b379bda/data/val.jsonl",
     "revision": "014a514fa998b4ac4519579fceb8a5884b379bda",
-    "local_path": "data/val.jsonl",
+    "local_path": "../../../datasets/agentdrift/data/val.jsonl",
     "bytes": 4895975,
     "sha256": "947e8d28857b3925a05522eef87032f529c1891219ecc8bcf4a1bb37084cc94a",
     "status": "downloaded"

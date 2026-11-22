@@ -1,9 +1,10 @@
 """Extract action frames and bind entity arguments using only the observed trajectory prefix."""
 from collections import defaultdict
 from dataclasses import dataclass
-from itertools import chain
 
 import stanza
+
+from .syntax_details import add_infinitive_modifiers, enrich_query
 
 
 @dataclass(frozen=True)
@@ -461,25 +462,34 @@ class Sentence:
 class IntentExtractor:
     """One instance per execution chain. Call extract_step in execution order."""
 
-    def __init__(self, pipeline=None):
+    def __init__(self, pipeline=None, *, include_modifiers=False):
         if pipeline is None:
             pipeline = stanza.Pipeline('en', processors=','.join(MODELS), package=MODELS,
                                        download_method=None, use_gpu=False, verbose=False)
         self.pipeline = pipeline
+        self.include_modifiers = include_modifiers
         self._focus = {}
 
     def extract_step(self, text, node_id):
         """Return (node ID, original sentence, frames) records for one incoming step."""
         return self.extract_document(self.pipeline(text), node_id)
 
-    def extract_document(self, document, node_id):
+    def extract_query(self, text, node_id="Q"):
+        """Start a new task with a user request, including polite requests and object qualifiers."""
+        return self.extract_document(self.pipeline(text), node_id, query=True)
+
+    def extract_document(self, document, node_id, *, query=False):
         """Use the same extractor when a caller already has a parsed Stanza document."""
         nodes = []
-        focus = self._focus
+        focus = {} if query else self._focus
         for i, sentence in enumerate(document.sentences, 1):
             key = node_id if len(document.sentences) == 1 else f'{node_id}.{i}'
             parser = Sentence(sentence, document.text, joint=True, refine=True)
             frames = parser.frames(previous=focus, node=key)
+            if query:
+                frames = enrich_query(parser, frames, key)
+            if self.include_modifiers:
+                add_infinitive_modifiers(parser, frames)
             focus = parser.next_focus
             original = document.text[sentence.tokens[0].start_char:sentence.tokens[-1].end_char]
             nodes.append((key, original, frames))
@@ -487,9 +497,18 @@ class IntentExtractor:
         return nodes
 
 
-def chain_frames(pipeline, episode):
-    """Yield nodes for one AgentDrift episode using the normal incremental extractor."""
+def project_frames(frames):
+    """Return the action/role/text representation used by the coherence experiments."""
+    return [
+        [frame["action"], [[arg["role"], arg["text"]] for arg in frame["arguments"]]]
+        for frame in frames
+    ]
+
+
+def chain_frames(pipeline, episode, *, enhance_query=False):
+    """Yield Q then agent steps. Opt into the qualified Q used in the query-repair trial."""
     extractor = IntentExtractor(pipeline)
-    steps = ((f'S{i:02d}', step['thought']) for i, step in enumerate(episode['steps'], 1))
-    for key, text in chain([('Q', episode['task'])], steps):
-        yield from extractor.extract_step(text, key)
+    read_query = extractor.extract_query if enhance_query else extractor.extract_step
+    yield from read_query(episode["task"], "Q")
+    for i, step in enumerate(episode["steps"], 1):
+        yield from extractor.extract_step(step["thought"], f"S{i:02d}")

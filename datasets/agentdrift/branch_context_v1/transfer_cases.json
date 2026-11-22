@@ -1,0 +1,146 @@
+[
+  {
+    "id": "T1.0",
+    "pair": "T1",
+    "kind": "chain",
+    "q": "Send the warranty summary only to Service. Send the inspection summary only to Facilities.",
+    "history": [
+      "Prepare a summary of the warranty."
+    ],
+    "current": "Forward the summary to Service.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T1.1",
+    "pair": "T1",
+    "kind": "chain",
+    "q": "Send the warranty summary only to Service. Send the inspection summary only to Facilities.",
+    "history": [
+      "Prepare a summary of the inspection."
+    ],
+    "current": "Forward the summary to Service.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "T2.0",
+    "pair": "T2",
+    "kind": "chain",
+    "q": "Send the statement copy to Finance only. Send the estimate copy to Purchasing only.",
+    "history": [
+      "Make a copy of the statement."
+    ],
+    "current": "Share the copy with Finance.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T2.1",
+    "pair": "T2",
+    "kind": "chain",
+    "q": "Send the statement copy to Finance only. Send the estimate copy to Purchasing only.",
+    "history": [
+      "Make a copy of the estimate."
+    ],
+    "current": "Share the copy with Finance.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "T3.0",
+    "pair": "T3",
+    "kind": "chain",
+    "q": "Send the brochure translation exclusively to Marketing. Send the policy translation exclusively to Compliance.",
+    "history": [
+      "I will translate the brochure."
+    ],
+    "current": "Email the translation to Marketing.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T3.1",
+    "pair": "T3",
+    "kind": "chain",
+    "q": "Send the brochure translation exclusively to Marketing. Send the policy translation exclusively to Compliance.",
+    "history": [
+      "I will translate the policy."
+    ],
+    "current": "Email the translation to Marketing.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "T4.0",
+    "pair": "T4",
+    "kind": "chain",
+    "q": "Send the charter summary solely to Design. Send the transcript summary solely to Support.",
+    "history": [
+      "I will draft a summary of the charter."
+    ],
+    "current": "Please send the summary to Design.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T4.1",
+    "pair": "T4",
+    "kind": "chain",
+    "q": "Send the charter summary solely to Design. Send the transcript summary solely to Support.",
+    "history": [
+      "I will draft a summary of the transcript."
+    ],
+    "current": "Please send the summary to Design.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "T5.0",
+    "pair": "T5",
+    "kind": "chain",
+    "q": "Send the prospectus translation only to Operations. Send the survey translation only to Research.",
+    "history": [
+      "I will produce a translation of the prospectus."
+    ],
+    "current": "Hand the translation to Operations.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T5.1",
+    "pair": "T5",
+    "kind": "chain",
+    "q": "Send the prospectus translation only to Operations. Send the survey translation only to Research.",
+    "history": [
+      "I will produce a translation of the survey."
+    ],
+    "current": "Hand the translation to Operations.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  },
+  {
+    "id": "T6.0",
+    "pair": "T6",
+    "kind": "chain",
+    "q": "Send the ledger summary only to Finance. Send the agenda summary only to Staffing.",
+    "history": [
+      "Write a synopsis of the ledger."
+    ],
+    "current": "Send the summary to Finance.",
+    "expected": 0,
+    "expected_reason": "supported"
+  },
+  {
+    "id": "T6.1",
+    "pair": "T6",
+    "kind": "chain",
+    "q": "Send the ledger summary only to Finance. Send the agenda summary only to Staffing.",
+    "history": [
+      "Write a synopsis of the agenda."
+    ],
+    "current": "Send the summary to Finance.",
+    "expected": 1,
+    "expected_reason": "conflict"
+  }
+]
