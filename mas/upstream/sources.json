@@ -1,0 +1,30 @@
+[
+  {
+    "project": "autogen-core",
+    "version": "0.7.5",
+    "url": "https://files.pythonhosted.org/packages/b1/11/fea52bf3541c5308bed1ee9b9b3596fa510b2c5db893d32b649d22f02b87/autogen_core-0.7.5.tar.gz",
+    "sha256": "70c2871389f1d0a7f6db8ef78717a51b7ce877ff4a08a836b7758d604dece203",
+    "archive": "autogen_core-0.7.5.tar.gz"
+  },
+  {
+    "project": "autogen-agentchat",
+    "version": "0.7.5",
+    "url": "https://files.pythonhosted.org/packages/e5/b6/df2f835ce3aaaa2716a3dfbbd4ab8855839184f08b35ce0baa23b26a1885/autogen_agentchat-0.7.5.tar.gz",
+    "sha256": "8d9c718db52ef24a518806b3a0ef848f0e4c1902877675dc0abed73a8e6e7755",
+    "archive": "autogen_agentchat-0.7.5.tar.gz"
+  },
+  {
+    "project": "camel-ai",
+    "version": "0.2.90",
+    "url": "https://files.pythonhosted.org/packages/26/b3/da958646c69b42cfafd3fc081b77bb19bb625773766da6ffa2d77c9c66e0/camel_ai-0.2.90.tar.gz",
+    "sha256": "43f11673390cc8d4451d6b1bb2913ddef6131f411f47da02d16a3989c8096d02",
+    "archive": "camel_ai-0.2.90.tar.gz"
+  },
+  {
+    "project": "metagpt",
+    "version": "0.8.2",
+    "url": "https://files.pythonhosted.org/packages/78/30/771db8e7c604a11b49d6f57ef70160d660e077afc8454906284fa51cb902/metagpt-0.8.2.tar.gz",
+    "sha256": "e7a7b39288b0494657bf94f22cf82a70e34459faadcf2ff263be193c814a2ef2",
+    "archive": "metagpt-0.8.2.tar.gz"
+  }
+]

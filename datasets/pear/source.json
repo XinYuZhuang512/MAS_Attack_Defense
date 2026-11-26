@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/MingxuanZhangPurdue/multiagent-vulnerable",
+  "revision": "cf69c68ccb1a532d3012f58f18ef7a05554d6fe3",
+  "selection": "First five registered base tasks in ascending numeric class ID per domain",
+  "domains": {
+    "banking": {
+      "source_path": "src/mav/Tasks/banking/user_tasks.py",
+      "source_blob": "deaac0fc1e43799e1dd9ce79467393d3f6adcfd6",
+      "environment_sha256": "5d196583a03da0398bf3922a52166399795d9b84dbd78ef66f992d9ece011820",
+      "injection_vectors_sha256": "5a18bd3aeb6d8d9e9fe94458cd7e06ceab4ed80aad85c2f42df2391af41eb0b5"
+    },
+    "slack": {
+      "source_path": "src/mav/Tasks/slack/user_tasks.py",
+      "source_blob": "4b6907075364ab059ded40a8291d6d8bee3f7a0d",
+      "environment_sha256": "0ea2f9b83e5ffaae0bf50fab2b13d6c8ee59a952f791b16c9554fdc48935c87d",
+      "injection_vectors_sha256": "efc01621ffa7955ee10e00e916ac933a41bd8347ba285e1e4888813bf5e0d3a2"
+    },
+    "travel": {
+      "source_path": "src/mav/Tasks/travel/user_tasks.py",
+      "source_blob": "1667d554fe87c09d330eec2f1c3e78f1b1978af6",
+      "environment_sha256": "ca8ef591bde5a8d8b9e2efe6830b8e4646c43f633c86f14cb878f588bb4b8a3c",
+      "injection_vectors_sha256": "a6ab848b39d862439e7b4844a617e578294de93cd0176c1851184dd901edb51c"
+    },
+    "workspace": {
+      "source_path": "src/mav/Tasks/workspace/user_tasks.py",
+      "source_blob": "be28cd929003e567ce7056e493506e66c16acaaf",
+      "environment_sha256": "5f3b9f0e5df93df00a3adc0936fde87e14d219879a788ef8762d8779374d5234"
+    }
+  }
+}

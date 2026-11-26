@@ -1,0 +1,16 @@
+{
+  "frames_by_field": {
+    "action": 13574,
+    "mode": 13574,
+    "evidence": 13574,
+    "arguments": 13574,
+    "modifiers": 2001,
+    "coordination": 3143,
+    "scope_warning": 81,
+    "reference": 14
+  },
+  "extractor_sha256": {
+    "extractor.py": "893ceb904e3980b5327ab5deba0e7ddc47c902c6ff1d7bafa7f053ba4f121bcc",
+    "syntax_details.py": "f8c744a925d47b618ac37529de6c9c06e891e70d71b3191727cca52b2214eadc"
+  }
+}

@@ -3,7 +3,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import stanza
+from stanza.models.common.doc import Document
 
+from .boundaries import repaired_sentences
+from .step_fragments import explicit_fragment
 from .syntax_details import add_infinitive_modifiers, enrich_query
 
 
@@ -72,6 +75,23 @@ class Sentence:
         # Preserve exact original text, including filenames split into multiple tokens.
         return self.text[self.offsets[min(ids)][0]:self.offsets[max(ids)][1]]
 
+    def argument_text(self, ids):
+        # Do not reintroduce omitted clauses between discontinuous token runs.
+        runs = []
+        for i in sorted(ids):
+            if not runs or runs[-1][-1] + 1 != i:
+                runs.append([])
+            runs[-1].append(i)
+        return ' … '.join(self.excerpt(run) for run in runs)
+
+    def prepositional_argument(self, marker, ids, prefix=''):
+        # UD attaches the other words of a compound preposition to its case marker.
+        markers = {marker.id}
+        markers.update(c.id for c in self.children[marker.id] if c.deprel == 'fixed')
+        prep = ' '.join(self.words[i].text.lower() for i in sorted(markers))
+        return {'role': prefix + prep, 'text': self.argument_text(set(ids) - markers),
+                'surface': self.argument_text(ids)}
+
     def subtree(self, word, excluded=()):
         ids = [word.id]
         for c in self.children[word.id]:
@@ -133,6 +153,72 @@ class Sentence:
                     return ids
         return []
 
+    def infinitival_argument(self, clause, role):
+        """Keep the infinitive's text and structure under its grammatical owner."""
+        if clause.upos != 'VERB' or not any(
+            marker.deprel == 'mark' and marker.lemma == 'to'
+            for marker in self.children[clause.id]
+        ):
+            return None
+        return {
+            'role': role,
+            'text': self.argument_text(self.subtree(clause, {'parataxis'})),
+            'action': clause.lemma,
+            'arguments': self.arguments(clause),
+        }
+
+    def object_clause_arguments(self, obj):
+        """Emit object qualifiers, retaining clause text when they leave details unrepresented."""
+        for clause in self.children[obj.id]:
+            if clause.id <= obj.id or clause.deprel.split(':')[0] != 'acl':
+                continue
+            children = self.children[clause.id]
+            if clause.deprel != 'acl:relcl':
+                infinitive = self.infinitival_argument(clause, 'obj.infinitive')
+                if infinitive is not None:
+                    yield infinitive
+                    continue
+                if clause.xpos not in {'VBG', 'VBN'} or any(
+                    w.deprel == 'mark' and w.lemma == 'to' for w in children
+                ):
+                    continue
+
+            qualifiers = []
+            covered = set()
+            for child in children:
+                if child.deprel.split(':')[0] == 'obl':
+                    marker = next((w for w in self.children[child.id] if w.deprel == 'case'), None)
+                    if marker is not None:
+                        ids = self.subtree(child, CLAUSAL)
+                        qualifiers.append(self.prepositional_argument(marker, ids, prefix='obj.'))
+                        covered.update(ids)
+
+            # A qualifier can stand alone for "associated with X". Keep the clause
+            # if that would discard another detail such as a subject, time or negation.
+            ids = self.subtree(clause, {'advcl', 'parataxis'})
+            remainder = (self.words[i] for i in ids if i != clause.id and i not in covered)
+            if not qualifiers or any(w.deprel.split(':')[0] not in {'aux', 'punct'} for w in remainder):
+                yield {'role': 'obj.clause', 'text': self.argument_text(ids).strip(' ,—')}
+            yield from qualifiers
+            for child in children:
+                if child.deprel.split(':')[0] == 'advcl':
+                    purpose = self.infinitival_argument(child, 'obj.purpose')
+                    if purpose is not None:
+                        yield {**purpose, 'head': clause.text}
+
+    def object_for_phrases(self, obj):
+        """Yield direct nominal 'for' modifiers and their full prepositional spans."""
+        for complement in self.children[obj.id]:
+            if complement.deprel != 'nmod' or complement.upos not in {'NOUN', 'PROPN', 'PRON'}:
+                continue
+            marker = next((w for w in self.children[complement.id]
+                           if w.deprel == 'case' and w.lemma == 'for' and w.id > obj.id), None)
+            if marker is None:
+                continue
+            ids = sorted(self.subtree(complement, CLAUSAL))
+            if ids[0] == marker.id and ids[-1] - ids[0] + 1 == len(ids):
+                yield marker, ids
+
     def arguments(self, w):
         args = []
         for c in self.children[w.id]:
@@ -144,10 +230,8 @@ class Sentence:
             if rel in {'obj','iobj'}:
                 role = rel
             elif rel == 'obl' and prep:
-                if prep == 'for' and w.lemma not in {'ask','search','look','pay','apply',
-                                                       'check','wait','file','register'}:
-                    continue
-                role = prep
+                args.append(self.prepositional_argument(case[0], self.subtree(c, excluded)))
+                continue
             elif rel in {'xcomp','ccomp'} and w.lemma in REPORT | {'notify'}:
                 role, excluded = 'requested_content', {'advcl','parataxis'}
             elif rel in {'advcl','ccomp'} and prep in {'if','whether','that'} and w.lemma in QUERY:
@@ -156,31 +240,26 @@ class Sentence:
                 role = 'condition'
             elif rel == 'advcl' and prep == 'as' and w.lemma == 'mark':
                 role = 'result_state'
+            elif rel == 'advcl' and prep == 'to':
+                purpose = self.infinitival_argument(c, 'purpose')
+                if purpose is not None:
+                    args.append(purpose)
             elif rel == 'compound' and c.deprel == 'compound:prt':
                 role = 'particle'
             if role:
                 ids = self.subtree(c, excluded)
+                for_phrases = []
                 if role == 'obj':
                     recipient = self.recipient_ids(w, c)
                     if recipient:
-                        args.append({'role':'to','text':self.excerpt(recipient)})
+                        args.append(self.prepositional_argument(self.words[recipient[0]], recipient))
                         ids = sorted(set(ids) - set(recipient))
-                # Some nested nodes can be non-projective. Emit the selected runs individually.
-                runs = []
-                for i in sorted(ids):
-                    if not runs or runs[-1][-1] + 1 != i:
-                        runs.append([])
-                    runs[-1].append(i)
-                args.append({'role':role,'text':' … '.join(self.excerpt(run) for run in runs)})
-        if self.refine:
-            for arg in args:
-                # Role encodes the preposition. Give explicit and pronominal
-                # destinations the same entity representation.
-                if arg['role'] in {'to', 'into'}:
-                    prep, space, value = arg['text'].partition(' ')
-                    if space and prep.lower() == arg['role']:
-                        arg['surface'] = arg['text']
-                        arg['text'] = value
+                    for_phrases = list(self.object_for_phrases(c))
+                    ids = sorted(set(ids).difference(*(span for _, span in for_phrases)))
+                args.append({'role':role,'text':self.argument_text(ids)})
+                if role == 'obj':
+                    args.extend(self.prepositional_argument(marker, span) for marker, span in for_phrases)
+                    args.extend(self.object_clause_arguments(c))
         return args
 
     def proceed_action(self, w):
@@ -199,10 +278,10 @@ class Sentence:
                 candidates.append(child)
         return candidates[0] if len(candidates) == 1 else None
 
-    def simple_phrase(self, head):
+    def simple_phrase(self, head, *, omit=()):
         """Exact, contiguous noun phrase, with no competing embedded entity or action."""
-        ids = sorted(self.subtree(head))
-        if ids != list(range(ids[0], ids[-1] + 1)):
+        ids = sorted(set(self.subtree(head)).difference(omit))
+        if not ids or ids != list(range(ids[0], ids[-1] + 1)):
             return None
         allowed = {'det', 'amod', 'compound', 'flat', 'nummod', 'punct', 'fixed', 'advmod'}
         if any(self.words[i].deprel.split(':')[0] not in allowed for i in ids if i != head.id):
@@ -269,6 +348,37 @@ class Sentence:
             or w.lemma in {'not', 'never', 'if', 'unless'}
             for w in self.words.values())
 
+    def fronted_possession(self, action, pronoun, node):
+        """Bind the object in 'Now that I have X, I should review it/them'."""
+        if action.deprel != 'root' or not any(w.deprel == 'nsubj' and w.lemma.lower() in {'i', 'we'}
+                                              for w in self.children[action.id]):
+            return None
+        before = [w for w in self.words.values() if w.id < action.id]
+        if [w.text.lower() for w in before[:2]] != ['now', 'that']:
+            return None
+        for source in before:
+            if source.lemma != 'have' or source.upos != 'VERB':
+                continue
+            link = self.words.get(source.head)
+            attached = source.head == action.id and source.deprel == 'advcl'
+            via_now = source.deprel == 'ccomp' and link and link.id == 1 and link.head == action.id
+            if not (attached or via_now):
+                continue
+            cs = self.children[source.id]
+            if any(w.deprel not in {'mark', 'nsubj', 'obj', 'punct'} for w in cs):
+                continue
+            if not any(w.deprel == 'nsubj' and w.lemma.lower() in {'i', 'we'} for w in cs):
+                continue
+            objects = [w for w in cs if w.deprel == 'obj']
+            if len(objects) != 1 or any(w.deprel not in {'det', 'amod', 'compound', 'nmod:poss', 'nummod'}
+                                        for w in self.children[objects[0].id]):
+                continue
+            source_ids = set(self.subtree(source))
+            if any(w.upos in {'NOUN', 'PROPN', 'VERB'} and w.id not in source_ids for w in before):
+                continue
+            return self.nominal_focus(source, action.id, node).get(pronoun)
+        return None
+
     def bind_nominals(self, action, controller, args, emitted, previous, node):
         governor = controller if controller is not None else action
         bound = {}
@@ -277,8 +387,6 @@ class Sentence:
             if role not in {'obj', 'to', 'into'}:
                 continue
             tokens = arg['text'].lower().split()
-            if role != 'obj' and tokens[:1] == [role]:
-                tokens = tokens[1:]
             if tokens not in (['it'], ['them']):
                 continue
             pronoun = tokens[0]
@@ -301,7 +409,9 @@ class Sentence:
                                   for c in self.children[anchor.id])
                 if (accepted or past) and not intervening and not disjunctive:
                     referent = self.nominal_focus(source, anchor.id, node).get(pronoun)
-            elif previous and self.simple_context(action, controller):
+            elif role == 'obj' and self.words[1].lemma.lower() == 'now':
+                referent = self.fronted_possession(action, pronoun, node)
+            if referent is None and not parallel and previous and self.simple_context(action, controller):
                 # A simple transitive action can continue the previous entity
                 # even when the verb changes, e.g. find -> read -> archive.
                 candidate = previous.get(pronoun)
@@ -332,35 +442,36 @@ class Sentence:
                 bound[pronoun] = referent
         return bound
 
-    def comparison_topic(self, action):
+    def bind_comparison_topic(self, action, frame):
         # A reported proposition can supply a topic for a bare "compare". Keep
         # it as attributed evidence, not as an observed destination or tool call.
         if action.deprel not in {'parataxis','conj'}:
-            return None
+            return
         if any(c.deprel.split(':')[0] in {'obj','iobj','obl','ccomp','xcomp','advcl','orphan'}
                for c in self.children[action.id]):
-            return None
+            return
         report = self.words.get(action.head)
         if report is None or report.deprel != 'root' or report.lemma not in REPORT or report.id >= action.id:
-            return None
+            return
         earlier = [w for w in self.children[report.id] if w.id < action.id]
         clauses = [w for w in earlier if w.deprel == 'ccomp']
         speakers = [w for w in earlier if w.deprel == 'nsubj']
         if len(clauses) != 1 or len(speakers) != 1 or any(
                 w.deprel in {'conj','parataxis','advcl'} or w.lemma in {'not','never'} for w in earlier):
-            return None
+            return
         clause = clauses[0]
         ids = sorted(self.subtree(clause))
         if ids[-1] >= action.id or ids != list(range(ids[0], ids[-1] + 1)):
-            return None
+            return
         words = [self.words[i] for i in ids]
-        if (any(w.deprel.split(':')[0] in CLAUSAL | {'conj'} or w.lemma in {'not','never'}
+        degree = {w.id for w in words if w.xpos in {'JJR','RBR','JJS','RBS'}}
+        if (any(w.deprel.split(':')[0] in CLAUSAL | {'conj'} or w.lemma in {'no','not','never','neither'}
                 for w in words if w.id != clause.id) or
-                not any(w.xpos in {'JJR','RBR','JJS','RBS'} for w in words)):
-            return None
+                not degree):
+            return
         speaker = self.simple_phrase(speakers[0])
         if not speaker:
-            return None
+            return
         topic = {'source': speaker, 'evidence': self.excerpt(ids), 'inferred': True}
         for dep, field in [('nsubj', 'claim_subject'), ('obj', 'claim_object')]:
             heads = [c for c in self.children[clause.id] if c.deprel == dep]
@@ -368,9 +479,122 @@ class Sentence:
                 phrase = self.simple_phrase(heads[0])
                 if phrase:
                     topic[field] = phrase
-        return topic
+        frame['inferred_topic'] = topic
 
-    def frames(self, previous=None, node=None):
+        # Anchor the comparative to the object it modifies ("a cheaper plan")
+        # or to the subject of a copular adjective ("the plan is cheaper").
+        children = self.children[clause.id]
+        objects = [c for c in children if c.deprel == 'obj']
+        subject = topic.get('claim_subject')
+        if len(objects) == 1:
+            anchor = objects[0]
+            properties = {c.id for c in self.children[anchor.id] if c.deprel in {'amod','nummod','det'}}
+        elif clause.upos == 'ADJ' and subject and any(c.deprel == 'cop' for c in children):
+            anchor = clause
+            properties = {clause.id}
+        else:
+            return
+        graded = degree | {w.head for w in words if w.id in degree and w.deprel == 'advmod'}
+        if properties.isdisjoint(graded):
+            return
+
+        # A nominal "than X" supplies a second operand only when attached to
+        # this comparison. Keep its words separate from the first operand.
+        markers = [w for w in words if w.lemma == 'than']
+        omitted = ()
+        standard = None
+        if markers:
+            if len(markers) != 1 or markers[0].deprel != 'case':
+                return
+            marker = markers[0]
+            other = self.words[marker.head]
+            if other.deprel not in {'nmod','obl'} or other.head not in properties | {anchor.id}:
+                return
+            standard = self.simple_phrase(other, omit=[marker.id])
+            if not standard:
+                return
+            omitted = self.subtree(other)
+        item = self.simple_phrase(anchor, omit=omitted) if objects else subject
+        if not item:
+            return
+
+        args = frame['arguments']
+        args.append({'role': 'obj', 'text': item, 'inferred': True})
+        if standard:
+            args.append({'role': 'obj', 'text': standard, 'inferred': True})
+
+    def evaluated_infinitive(self, root):
+        """An impersonal positive evaluation can introduce a contemplated action."""
+        cs = self.children[root.id]
+        it = next((w for w in cs if w.deprel == 'expl' and w.lemma.lower() == 'it'), None)
+        if it is None or root.upos != 'ADJ':
+            return None
+        conditional = any(w.deprel == 'aux' and w.lemma == 'would' and it.id < w.id for w in cs)
+        necessity = (root.lemma in {'necessary', 'essential', 'crucial'} and
+                     any(w.deprel == 'cop' and w.xpos in {'VBZ','VBP'} for w in cs) and
+                     not any(w.deprel == 'aux' for w in cs))
+        if necessity and any(w.lemma in {'no','not','never'} and w.id < root.id for w in self.words.values()):
+            return None
+        if necessity and (any(c.lemma in {'hardly','rarely','never','not','unclear'} or
+                              c.deprel.split(':')[0] == 'obl' for c in cs) or
+                          any(w.text in {'"', '“', '”', "''"} for w in self.words.values())):
+            return None
+        if not necessity and not (conditional and root.lemma in
+                                  {'convenient', 'helpful', 'useful', 'beneficial', 'advisable'}):
+            return None
+        if not any(w.deprel == 'cop' and w.lemma == 'be' for w in cs):
+            return None
+        if any(w.text == '?' or w.lemma in {'if', 'unless'} for w in self.words.values()):
+            return None
+        if any(w.lemma in {'not', 'never', 'hardly', 'scarcely', 'less'} for w in cs):
+            return None
+        for verb in cs:
+            if verb.deprel == 'csubj' and verb.xpos == 'VB':
+                children = self.children[verb.id]
+                if any(w.deprel.startswith('nsubj') or w.lemma in {'not', 'never'} for w in children):
+                    continue
+                if any(w.deprel == 'mark' and w.lemma == 'to' for w in children):
+                    return verb
+        return None
+
+    def independent_decision(self, report, verb):
+        """Recover a comma-separated agent decision attached as a second complement."""
+        if (report.deprel != 'root' or report.lemma not in REPORT | {'recommend', 'indicate'} or
+                verb.upos != 'VERB'):
+            return False
+        speakers = [c for c in self.children[report.id] if c.deprel == 'nsubj']
+        if len(speakers) != 1 or speakers[0].text.lower() in {'i', 'we', 'you'}:
+            return False
+        children = self.children[verb.id]
+        subject = next((c for c in children if c.deprel == 'nsubj' and c.text.lower() in {'i','we'}), None)
+        modals = {c.lemma for c in children if c.deprel == 'aux'}
+        if subject is None or not (modals & {'will','shall','must','should'} or verb.lemma in CONTROL):
+            return False
+        boundary = subject.id - 1
+        if boundary > 0 and self.words[boundary].text.lower() in {'so','but'}:
+            boundary -= 1
+        if boundary <= report.id or self.words[boundary].text != ',':
+            return False
+        # A comma after a bare reporting verb or a parenthetical does not end reported speech.
+        # Require a substantive complement before the comma. Abstain on quoted,
+        # conditional and question contexts, or an earlier first-person instruction.
+        if any(w.text == '?' or w.lemma.lower() in {'if','unless'} for w in self.words.values()):
+            return False
+        quote_tokens = [w for w in self.words.values() if w.upos == 'PUNCT' and
+                        w.text in {'"', '“', '”', '‘', '’', "'", "``", "''"}]
+        if len(quote_tokens) % 2 or any(w.id > boundary for w in quote_tokens):
+            return False
+        if 'will' not in modals and any(w.text.lower() in {'i','we'} and w.deprel == 'nsubj'
+                                        for w in self.words.values() if report.id < w.id < boundary):
+            return False
+        return any(report.id < c.id < boundary and (
+            c.deprel in {'obj','ccomp','xcomp'} or
+            c.deprel == 'advcl' and any(k.deprel == 'mark' and k.lemma == 'to' for k in self.children[c.id]) or
+            c.deprel == 'obl' and any(k.xpos == 'VBG' and k.deprel == 'case'
+                                      for k in self.children[c.id]))
+                   for c in self.children[report.id])
+
+    def frames(self, previous=None, node=None, *, imperative_list=False):
         found = []
         emitted = {}
         self.next_focus = {}
@@ -382,7 +606,18 @@ class Sentence:
             aux = [x for x in children if x.deprel == 'aux']
             mode = next((MODES[x.lemma] for x in aux if x.lemma in MODES), None)
             locally_negated = any(x.lemma in {'not','never'} and x.deprel == 'advmod' for x in children)
-            allowed = w.upos == 'VERB' and not locally_negated and not self.in_subordinate_clause(w,controller)
+            subordinate = self.in_subordinate_clause(w, controller)
+            if subordinate and w.deprel == 'parataxis' and first and mode == 'stated_plan':
+                # A preceding reason clause can overrun the comma in the constituency tree.
+                parent = self.words[w.head]
+                start = subjects[0].id
+                if (parent.deprel == 'root' and parent.lemma not in REPORT and start > 1 and
+                        self.words[start-1].text == ',' and
+                        any(c.deprel == 'obj' and c.id < start for c in self.children[parent.id]) and
+                        not any(c.lemma in {'if','unless'} or c.text in {'?', '"', '“', '”', "'", "''"}
+                                for c in self.words.values())):
+                    subordinate = False
+            allowed = w.upos == 'VERB' and not locally_negated and not subordinate
             own = None
             if allowed:
                 if first and (mode or w.lemma in CONTROL):
@@ -393,8 +628,18 @@ class Sentence:
                     own = 'implicit_subject'
                 elif first and w.xpos == 'VBG' and any(x.lemma == 'be' for x in aux):
                     own = 'ongoing'
+            # Stanza expands Let's into let + a first-person object with lemma we.
             is_control = w.lemma in CONTROL or (w.lemma == 'let' and any(
-                x.text.lower() in {'me','us'} and x.deprel in {'obj','iobj'} for x in children))
+                x.deprel in {'obj', 'iobj'} and (
+                    x.text.lower() in {'me', 'us'} or (x.lemma == 'we' and x.text.lower() in {"'s", '’s'})
+                ) for x in children))
+            if (allowed and not own and is_control and w.lemma == 'let' and
+                    w.deprel == 'parataxis' and self.words[w.head].deprel == 'root' and
+                    any(c.deprel == 'expl' or (c.deprel == 'nsubj' and c.text.lower() in {'i','we'})
+                        for c in self.children[w.head]) and self.words[w.head].lemma not in REPORT and
+                    not subjects and
+                    not any(c.text in {'"', '“', '”', '?'} for c in self.words.values())):
+                own = 'implicit_subject'
             parent_for_coord = relation
             activity = self.proceed_action(w) if own and self.refine else None
             if activity is not None:
@@ -421,9 +666,7 @@ class Sentence:
                     if mode_name != 'unresolved_reference' and w.lemma != 'do':
                         bindings[w.id] = self.bind_nominals(w, controller, args, emitted, previous, node)
                     if w.lemma == 'compare' and not args:
-                        topic = self.comparison_topic(w)
-                        if topic:
-                            frame['inferred_topic'] = topic
+                        self.bind_comparison_topic(w, frame)
                 if relation is not None:
                     frame['coordination'] = relation
                 parent = self.words.get(w.head)
@@ -445,7 +688,46 @@ class Sentence:
                         walk(c, own, controller, edge)
                 elif c.deprel == 'parataxis':
                     walk(c)
-        walk(next(w for w in self.words.values() if w.head==0))
+        root = next(w for w in self.words.values() if w.head == 0)
+        candidate = self.evaluated_infinitive(root) if self.refine else None
+        if candidate is not None:
+            mode = 'required' if root.lemma in {'necessary','essential','crucial'} else 'possible'
+            walk(candidate, mode, root)
+        elif self.refine and root.lemma in {'step','essential','crucial','necessary'}:
+            cs = self.children[root.id]
+            if ((root.upos == 'ADJ' or any(c.deprel == 'amod' and c.lemma == 'next' for c in cs)) and
+                    any(c.deprel == 'cop' and c.xpos in {'VBZ','VBP'} for c in cs) and
+                    not any(w.lemma in {'not','never','if','unless'} or w.text == '?' for w in self.words.values())):
+                for action in cs:
+                    if action.deprel == 'csubj' and action.xpos == 'VBG':
+                        walk(action, 'stated_plan' if root.lemma == 'step' else 'required', root)
+        walk(root, controller=root if imperative_list else None)
+        if self.refine and not found and root.xpos == 'VBN':
+            cs = self.children[root.id]
+            modal = next((c.lemma for c in cs if c.deprel == 'aux' and c.lemma in {'should','must'}), None)
+            patient = next((c for c in cs if c.deprel == 'nsubj:pass'), None)
+            attributed = any(w.text.lower() in {'according','per'}
+                             for w in self.words.values() if patient and w.id < patient.id)
+            if (modal and patient and not attributed and
+                    any(c.lemma == modal and c.id > patient.id for c in cs) and
+                    any(c.deprel == 'aux:pass' and c.xpos == 'VB' for c in cs)
+                    and not any(w.lemma in {'not','never','if','unless','by'} or
+                                w.text in {'?', '"', '“', '”'} for w in self.words.values())
+                    and not any(c.deprel.split(':')[0] in {'conj','parataxis','advcl'}
+                                and c.id < root.id for c in cs)):
+                obj = self.argument_text(self.subtree(patient, {'punct'}))
+                found.append({'action': root.lemma, 'mode': MODES[modal], 'actor': 'unspecified',
+                              'evidence': self.excerpt([root.id]),
+                              'arguments': [{'role':'obj', 'text':obj}, *self.arguments(root)]})
+        if self.refine and not found and root.lemma in REPORT | {'recommend','indicate'}:
+            # UD may attach the decision to the reporting verb or its first complement.
+            for verb in self.words.values():
+                parent = self.words.get(verb.head)
+                direct = verb.head == root.id and verb.deprel == 'ccomp'
+                nested = (verb.deprel == 'parataxis' and parent is not None and parent.head == root.id
+                          and parent.deprel in {'xcomp','ccomp'})
+                if (direct or nested) and self.independent_decision(root, verb):
+                    walk(verb)
         if self.refine and len(emitted) == 1 and found[0]['mode'] != 'possible':
             ident, controller = next(iter(emitted.items()))
             w = self.words[ident]
@@ -478,14 +760,238 @@ class IntentExtractor:
         """Start a new task with a user request, including polite requests and object qualifiers."""
         return self.extract_document(self.pipeline(text), node_id, query=True)
 
+    def extract_step_candidates(self, text, node_id, candidates):
+        """Extract one step sentence from scored CT/UD candidates on the original text."""
+        from .candidates import weighted_frames
+        frames, focus, diagnostics = weighted_frames(
+            self.pipeline, text, node_id, candidates, self._focus, self.include_modifiers)
+        self._focus = focus
+        return [(node_id, text, frames)], diagnostics
+
+    def repair_fragment(self, sentence, text):
+        # A bare VP with a nominal-tagged head contradicts the constituency parse.
+        # Retag only the head and rerun lemma/UD on the original words and offsets.
+        phrase = sentence.constituency
+        while phrase.label in {'ROOT', 'S'} and phrase.children:
+            phrase = phrase.children[0]
+        first = sentence.words[0]
+        # In elliptical transfer actions, a second endpoint can disambiguate a
+        # nominal analysis (e.g. "Syncing email with compliance").
+        endpoint = {'syncing': {'with'}, 'transferring': {'to','from'},
+                    'moving': {'to','into','from'}, 'copying': {'to','into','from'}}.get(first.text.lower())
+        root = next(w for w in sentence.words if w.head == 0)
+        paired = (endpoint and first.deprel == 'compound' and first.head == root.id and
+                  first.xpos in {'NN','NNS','VBG'} and root.upos in {'NOUN','PROPN'} and
+                  any(w.deprel == 'case' and w.lemma in endpoint and
+                      sentence.words[w.head-1].head == root.id for w in sentence.words))
+        if ((not paired and (phrase.label != 'VP' or len(phrase.children) < 2 or
+                phrase.children[0].label not in {'NN', 'NNS'} or
+                first.head != 0 or first.xpos != phrase.children[0].label or
+                not any(child.label in {'NP', 'PP'} for child in phrase.children[1:]))) or
+                any(w.xpos == 'MD' or w.deprel.startswith(('nsubj', 'csubj')) or
+                    w.text in {'?', '"', '“', '”'} for w in sentence.words)):
+            return None
+        gerund = first.text.lower().endswith('ing')
+        if not gerund and not any(child.label == 'NP' for child in phrase.children[1:]):
+            return None
+        repaired = Document([sentence.to_dict()], text=text)
+        head = repaired.sentences[0].words[0]
+        head.upos, head.xpos = 'VERB', 'VBG' if gerund else 'VB'
+        self.pipeline.processors['lemma'].process(repaired)
+        self.pipeline.processors['depparse'].process(repaired)
+        candidate = repaired.sentences[0]
+        if (candidate.words[0].head != 0 or
+                gerund and candidate.words[0].lemma.lower() == first.text.lower()):
+            return None
+        if paired:
+            objects = {w.id for w in candidate.words if w.head == 1 and w.deprel == 'obj'}
+            if not objects:
+                return None
+            mark = next((w for w in candidate.words if w.deprel == 'case' and w.lemma in endpoint), None)
+            if mark is None:
+                return None
+            target = candidate.words[mark.head-1]
+            if target.head in objects and target.deprel == 'nmod':
+                # Verify disputed attachment in an explicit progressive sentence;
+                # transfer only the dependency between aligned original words.
+                start, end = sentence.tokens[0].start_char, sentence.tokens[-1].end_char
+                variant = self.pipeline('I am ' + text[start:start+1].lower() + text[start+1:end])
+                if len(variant.sentences) != 1:
+                    return None
+                probe = variant.sentences[0].words
+                if (len(probe) != len(candidate.words) + 2 or
+                        any(a.text.casefold() != b.text.casefold() for a,b in zip(candidate.words, probe[2:])) or
+                        probe[2].head != 0 or probe[target.id+1].head != 3 or
+                        probe[target.id+1].deprel != 'obl'):
+                    return None
+                target.head, target.deprel = 1, 'obl'
+            if target.head != 1 or target.deprel != 'obl':
+                return None
+            if first.text.lower() == 'syncing' and candidate.words[0].lemma == 'synce':
+                candidate.words[0].lemma = 'sync'
+        candidate.constituency = sentence.constituency
+        return Sentence(candidate, text, joint=True, refine=True)
+
+    def imperative_reading(self, document):
+        # Test a case variant when a bare directive initially looks nominal.
+        # Require a verb reading with an overt argument on the unchanged source words.
+        text = document.text
+        words = [w for s in document.sentences for w in s.words]
+        if (len(words) < 2 or words[0].start_char != 0 or not text[0].isupper() or
+                not text[0].isascii() or words[0].xpos not in {'NN','NNS','JJ','RB','VBG'} or
+                words[0].deprel not in {'root','compound','amod','advmod'} or
+                any(w.text in {'!', '?', ';', '"', '“', '”', '.'} for w in words[:-1])):
+            return None
+        original_root = next(w for w in words if w.head == 0)
+        if any(w.head == original_root.id and w.deprel.startswith(('nsubj','csubj','cop'))
+               for w in document.sentences[0].words):
+            return None
+        variant = text[0].lower() + text[1:]
+        if not variant.rstrip().endswith(('.', '!', '?')):
+            variant = variant.rstrip() + '.'
+        doc = self.pipeline(variant)
+        sentences = repaired_sentences(doc, self.pipeline)
+        if len(sentences) != 1:
+            return None
+        sentence = sentences[0]
+        verb = sentence.words[0]
+        if (words[0].text.lower().endswith('ing') and variant.endswith('.') and
+                not text.rstrip().endswith('.') and (verb.xpos != 'VBG' or verb.head != 0)):
+            plain = self.pipeline(variant[:-1])
+            options = repaired_sentences(plain, self.pipeline)
+            if len(options) == 1:
+                sentence = options[0]
+                verb = sentence.words[0]
+        if (verb.start_char != 0 or verb.end_char != words[0].end_char or
+                verb.head != 0 or verb.xpos not in {'VB','VBG'} or verb.upos != 'VERB'):
+            return None
+        parsed = Sentence(sentence, text, joint=True, refine=True)
+        obj = next((w for w in parsed.children[verb.id] if w.deprel == 'obj'), None)
+        if (any(w.deprel.startswith(('nsubj','csubj','cop')) or w.lemma in {'not','never'}
+                for w in parsed.children[verb.id]) or
+                any(w.text == '?' for w in sentence.words)):
+            return None
+        # A capitalized noun followed by another bare noun is ambiguous ("Record player").
+        if obj is not None and (verb.xpos == 'VBG' or
+                any(c.deprel in {'det','amod','nummod','nmod:poss'} for c in parsed.children[obj.id]) or
+                any(c.deprel in {'obl','advcl','conj'} for c in parsed.children[verb.id])):
+            return parsed
+        if verb.xpos == 'VBG' and verb.lemma == 'proceed' and any(c.deprel == 'xcomp' for c in parsed.children[verb.id]):
+            return parsed
+        if not (verb.lemma in {'login','logout'} and any(c.deprel == 'obl' for c in parsed.children[verb.id])):
+            return None
+        return parsed
+
+    def directed_command(self, document):
+        """Validate an ambiguous imperative with an object and a separate role."""
+        if len(document.sentences) != 1:
+            return None
+        sent = document.sentences[0]
+        words = sent.words
+        roles = {'forward': {'to'}, 'record': {'for','with'}, 'schedule': {'for','with'},
+                 'update': {'with'}}.get(words[0].text.lower())
+        if (not roles or words[0].xpos not in {'NN','JJ','RB'} or
+                not any(w.lemma in roles for w in words) or
+                any(w.deprel.startswith(('nsubj','csubj','cop')) or w.xpos == 'MD' or
+                    w.lemma in {'if','unless','not','never'} or w.text in {'?', '"', '“', '”'}
+                    for w in words)):
+            return None
+        text = document.text[sent.tokens[0].start_char:sent.tokens[-1].end_char]
+        probe = self.pipeline('Please ' + text[0].lower() + text[1:])
+        if len(probe.sentences) != 1:
+            return None
+        ps = probe.sentences[0].words
+        if (len(ps) != len(words) + 1 or ps[1].head != 0 or ps[1].xpos != 'VB' or
+                any(x.text.casefold() != y.text.casefold() for x,y in zip(words,ps[1:])) or
+                any(w.head == 1 for w in ps[1:])):
+            return None
+        obj = next((w for w in ps if w.head == 2 and w.deprel == 'obj'), None)
+        if obj is None or not any(w.deprel == 'case' and w.lemma in roles and
+                ps[w.head-1].head in {2,obj.id} for w in ps):
+            return None
+        if ps[1].lemma == 'record' and obj.xpos == 'NN' and not any(
+                w.head == obj.id and w.deprel in {'amod','det','compound','nummod'} for w in ps):
+            return None
+        # Project the verified UD edges onto the original sentence, retaining
+        # its source offsets and omitting the synthetic politeness marker.
+        copy = Document([sent.to_dict()], text=document.text).sentences[0]
+        for w, alternative in zip(copy.words, ps[1:]):
+            w.upos, w.xpos, w.lemma = alternative.upos, alternative.xpos, alternative.lemma
+            w.head = alternative.head - 1 if alternative.head else 0
+            w.deprel = alternative.deprel
+        copy.constituency = sent.constituency
+        return Sentence(copy, document.text, joint=True, refine=True)
+
+    def modal_acronym(self, sentence, text):
+        root = next(w for w in sentence.words if w.head == 0)
+        cs = [w for w in sentence.words if w.head == root.id]
+        token = root
+        if root.xpos == 'MD' and root.id < len(sentence.words):
+            token = sentence.words[root.id]
+            if token.text.lower() not in {'cc','bcc'}:
+                return None
+        if (token.upos != 'PROPN' or not token.text.isascii() or not token.text.isalpha()
+                or not token.text.isupper() or len(token.text) < 2):
+            return None
+        if (not any(c.deprel == 'nsubj' and c.text.lower() in {'i','we'} for c in cs) or
+                not (root.xpos == 'MD' and root.lemma in {'should','will','must'} or
+                     any(c.deprel == 'aux' and c.lemma in {'should','will','must'} for c in cs)) or
+                any(w.lemma in {'if','unless','not','never'} or w.text in {'?', '"', '“', '”'}
+                    for w in sentence.words)):
+            return None
+        # The modal selects a bare infinitive. Require an overt object after UD reparsing.
+        repaired = Document([sentence.to_dict()], text=text)
+        target = repaired.sentences[0].words[token.id-1]
+        target.upos, target.xpos, target.lemma = 'VERB', 'VB', target.text.lower()
+        self.pipeline.processors['depparse'].process(repaired)
+        candidate = repaired.sentences[0]
+        if target.head != 0 or not any(w.head == target.id and w.deprel == 'obj' for w in candidate.words):
+            return None
+        candidate.constituency = sentence.constituency
+        return Sentence(candidate, text, joint=True, refine=True)
+
+    def imperative_list(self, document, reading):
+        """Keep the original coordination when both parses support a leading command."""
+        if len(document.sentences) != 1:
+            return reading
+        source = document.sentences[0]
+        head = source.words[0]
+        if head.head != 0 or not any(w.head == head.id and w.xpos == 'VB' and
+                                     w.deprel in {'parataxis','conj'} for w in source.words):
+            return reading
+        copy = Document([source.to_dict()], text=document.text).sentences[0]
+        copy.constituency = source.constituency
+        verb = reading.words[1]
+        copy.words[0].upos, copy.words[0].xpos, copy.words[0].lemma = verb.upos, verb.xpos, verb.lemma
+        for w in copy.words:
+            if w.head != head.id:
+                continue
+            if w.deprel == 'nmod' and any(c.deprel == 'case' and c.head == w.id for c in copy.words):
+                w.deprel = 'obl'
+            if (w.deprel == 'parataxis' and w.xpos == 'VB' and
+                    not any(c.head == w.id and c.deprel.startswith(('nsubj','csubj','mark')) for c in copy.words)):
+                w.deprel = 'conj'
+        return Sentence(copy, document.text, joint=True, refine=True)
+
     def extract_document(self, document, node_id, *, query=False):
         """Use the same extractor when a caller already has a parsed Stanza document."""
         nodes = []
         focus = {} if query else self._focus
-        for i, sentence in enumerate(document.sentences, 1):
-            key = node_id if len(document.sentences) == 1 else f'{node_id}.{i}'
+        repaired_fragment = False
+        sentences = repaired_sentences(document, self.pipeline)
+        for i, sentence in enumerate(sentences, 1):
+            key = node_id if len(sentences) == 1 else f'{node_id}.{i}'
             parser = Sentence(sentence, document.text, joint=True, refine=True)
             frames = parser.frames(previous=focus, node=key)
+            if not frames:
+                alternate = self.repair_fragment(sentence, document.text) or self.modal_acronym(sentence, document.text)
+                if alternate is not None:
+                    repaired = alternate.frames(previous=focus, node=key)
+                    if repaired:
+                        parser, frames = alternate, repaired
+                        repaired_fragment = True
+            if not query and not frames:
+                frames = explicit_fragment(parser, focus, key)
             if query:
                 frames = enrich_query(parser, frames, key)
             if self.include_modifiers:
@@ -493,6 +999,27 @@ class IntentExtractor:
             focus = parser.next_focus
             original = document.text[sentence.tokens[0].start_char:sentence.tokens[-1].end_char]
             nodes.append((key, original, frames))
+        if nodes and (not any(frames for _, _, frames in nodes) or
+                                     not query and len(nodes) == 1 and repaired_fragment):
+            alternate = self.imperative_reading(document) or self.directed_command(document)
+            if alternate is not None:
+                coordinated = self.imperative_list(document, alternate) if query else alternate
+                repaired = coordinated.frames(previous={} if query else self._focus, node=node_id,
+                                              imperative_list=coordinated is not alternate)
+                alternate = coordinated
+                if repaired:
+                    # These gerunds have irregular predictions in the English lemmatizer.
+                    first_frame = repaired[0]
+                    correction = {('syncing', 'synce'): 'sync', ('downloading', 'downloading'): 'download'}
+                    key = (first_frame['evidence'].lower(), first_frame['action'])
+                    if key in correction:
+                        first_frame['action'] = correction[key]
+                    if query:
+                        repaired = enrich_query(alternate, repaired, node_id)
+                    if self.include_modifiers:
+                        add_infinitive_modifiers(alternate, repaired)
+                    nodes = [(node_id, document.text.strip(), repaired)]
+                    focus = alternate.next_focus
         self._focus = focus if nodes else {}
         return nodes
 

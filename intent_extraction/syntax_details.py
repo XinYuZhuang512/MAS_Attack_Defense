@@ -50,16 +50,58 @@ def _object_qualifiers(tree, verb):
     for obj in tree.children[verb.id]:
         if obj.deprel != "obj":
             continue
+        separated = {marker.id for marker, _ in tree.object_for_phrases(obj)}
         for child in tree.children[obj.id]:
             if child.deprel.split(":")[0] != "nmod":
                 continue
-            case = next(
-                (w.lemma for w in tree.children[child.id] if w.deprel == "case"), None
-            )
-            if case:
+            marker = next((w for w in tree.children[child.id] if w.deprel == "case"), None)
+            if marker and marker.id not in separated:
                 ids = sorted(tree.subtree(child, {"acl", "advcl", "ccomp", "conj"}))
                 if ids[-1] - ids[0] + 1 == len(ids):
-                    yield {"role": "obj." + case, "text": tree.excerpt(ids)}
+                    yield tree.prepositional_argument(marker, ids, prefix="obj.")
+
+
+def _copular_queries(tree):
+    """Normalize direct 'what is/are NP' questions, including coordinated questions."""
+    root = next(w for w in tree.words.values() if w.head == 0)
+    # UD can make either "what" or its nominal answer slot the predicate.
+    first = tree.words[1]
+    inverse = (root.upos in {"NOUN", "PROPN"} and first.lemma.lower() == "what" and
+               first.head == root.id and first.deprel == "nsubj" and
+               any(w.deprel == "cop" and w.id == first.id + 1 for w in tree.children[root.id]))
+    primary = first if inverse else root
+    if primary.lemma.lower() != "what":
+        return
+    for wh in tree.words.values():
+        if wh.id != primary.id and not (wh.head == primary.id and wh.deprel == "conj" and wh.lemma.lower() == "what"):
+            continue
+        children = tree.children[wh.id]
+        if inverse and wh.id == first.id:
+            subject = root
+        else:
+            subjects = [w for w in children if w.deprel == "nsubj" and w.upos in {"NOUN", "PROPN"}]
+            if len(subjects) != 1:
+                continue
+            subject = subjects[0]
+        # In a coordinated question Stanza may attach the copula to the nominal subject.
+        clause = children + tree.children[subject.id]
+        if not any(w.deprel == "cop" and w.lemma == "be" and w.xpos in {"VBP", "VBZ"} for w in clause):
+            continue
+        if any(w.deprel in {"aux", "advcl"} or w.lemma in {"not", "never"} for w in clause):
+            continue
+        ids = set(tree.subtree(subject, {"cop", "punct"}))
+        if inverse and wh.id == first.id:
+            ids.difference_update(tree.subtree(wh))
+        qualifiers = []
+        for child in tree.children[subject.id]:
+            if child.deprel == "nmod":
+                marker = next((w for w in tree.children[child.id] if w.deprel == "case"), None)
+                if marker is not None:
+                    phrase = tree.subtree(child)
+                    qualifiers.append(tree.prepositional_argument(marker, phrase, prefix="obj."))
+                    ids.difference_update(phrase)
+        yield ({"action": "query", "mode": "requested", "evidence": wh.text,
+                "arguments": [{"role": "obj", "text": tree.argument_text(ids)}, *qualifiers]}, wh)
 
 
 def enrich_query(tree, original, node):
@@ -101,6 +143,11 @@ def enrich_query(tree, original, node):
             for qualifier in _object_qualifiers(tree, word):
                 if qualifier not in frame["arguments"]:
                     frame["arguments"].append(qualifier)
+    questions = list(_copular_queries(tree))
+    if questions:
+        tree.next_focus = {}
+        anchored.extend(questions)
+        anchored.sort(key=lambda item: item[1].id if item[1] is not None else len(tree.words) + 1)
     return [frame for frame, _ in anchored]
 
 

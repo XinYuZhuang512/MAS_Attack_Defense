@@ -1,0 +1,46 @@
+{
+  "condition": "indirect_prompt_injection",
+  "planned_pairs": 1761,
+  "paired_attack_traces": 0,
+  "unpaired": 1761,
+  "planned_by_dataset_and_system": {
+    "pear": {
+      "autogen": 123,
+      "camel": 123,
+      "metagpt": 123
+    },
+    "humaneval": {
+      "autogen": 164,
+      "camel": 164,
+      "metagpt": 164
+    },
+    "mmlu": {
+      "autogen": 300,
+      "camel": 300,
+      "metagpt": 300
+    }
+  },
+  "manifest_sha256": "4db840a408a6801d6fe12bae154ba920667192ef659f508e690829157d1e814e",
+  "checked_sources": [
+    {
+      "path": "attacks/pear_privacy_cases.jsonl",
+      "records": 40,
+      "record_type": "benchmark_case_reference",
+      "paired_attack_traces": 0
+    },
+    {
+      "path": "datasets/agentdrift/data",
+      "records": 12536,
+      "categories": {
+        "benign": 4000,
+        "attacked": 5536,
+        "failed_attack": 1500,
+        "hard_negative": 1500
+      },
+      "normalized_query_matches_in_attacked_categories": 0,
+      "paired_attack_traces": 0,
+      "reason": "No available execution provenance matching these MAS and model configurations."
+    }
+  ],
+  "cot_annotations_created": 0
+}

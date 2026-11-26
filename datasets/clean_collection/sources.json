@@ -1,0 +1,88 @@
+{
+  "humaneval": {
+    "revision": "b9453e8f1865df0a0057a1383767caa400acfbcf",
+    "url": "https://raw.githubusercontent.com/openai/human-eval/b9453e8f1865df0a0057a1383767caa400acfbcf/data/HumanEval.jsonl.gz",
+    "sha256": "b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef",
+    "selection_count": 164,
+    "selection_sha256": "3fdcb50e9fa5e624fbeceddaf276fa992ecfd3f4782b5e3fdae0a699671c0e25"
+  },
+  "mmlu": {
+    "revision": "c30699e8356da336a370243923dbaf21066bb9fe",
+    "url": "https://huggingface.co/datasets/cais/mmlu/resolve/c30699e8356da336a370243923dbaf21066bb9fe/all/test-00000-of-00001.parquet",
+    "sha256": "74a41822ce7d3def56e1682f958469c04642a5336a5ce912fa375fdb90fb25d7",
+    "selection_count": 300,
+    "selection_sha256": "07b61dcb918e019bc01a51abf7fefdd64f83ee90c08aed9d930a1dfa0abbdfec",
+    "selection": {
+      "seed": 20261125,
+      "split": "all/test",
+      "method": "near-equal allocation across humanities and social science subjects after normalized deduplication",
+      "subjects": [
+        "econometrics",
+        "formal_logic",
+        "high_school_european_history",
+        "high_school_geography",
+        "high_school_government_and_politics",
+        "high_school_macroeconomics",
+        "high_school_microeconomics",
+        "high_school_psychology",
+        "high_school_us_history",
+        "high_school_world_history",
+        "human_sexuality",
+        "international_law",
+        "jurisprudence",
+        "logical_fallacies",
+        "moral_disputes",
+        "moral_scenarios",
+        "philosophy",
+        "prehistory",
+        "professional_law",
+        "professional_psychology",
+        "public_relations",
+        "security_studies",
+        "sociology",
+        "us_foreign_policy",
+        "world_religions"
+      ]
+    }
+  },
+  "pear": {
+    "revision": "cf69c68ccb1a532d3012f58f18ef7a05554d6fe3",
+    "blobs": {
+      "src/mav/Tasks/banking/environment.py": "62a511fcc466d3e4ef472f8aa878aa070ad759a9",
+      "src/mav/Tasks/banking/task_suite.py": "82fd7c4a41ebd39efb81ed3be5e1ed394c460c5a",
+      "src/mav/Tasks/banking/tools.py": "65e752b23e52caf89ca8c8da474a07258f132551",
+      "src/mav/Tasks/banking/user_tasks.py": "deaac0fc1e43799e1dd9ce79467393d3f6adcfd6",
+      "src/mav/Tasks/base_environment.py": "f98094931716ef4e3f84ddfe9bbe2115c9e85806",
+      "src/mav/Tasks/base_tasks.py": "4989d2dc555700f67fa65130afa18bfcb55e2c29",
+      "src/mav/Tasks/items.py": "b223c132df86cbdacc195eaa9cc975039e4d63d2",
+      "src/mav/Tasks/slack/environment.py": "cea6c7204e077495106833ef095b61fd32b7dbf9",
+      "src/mav/Tasks/slack/task_suite.py": "85e71d20e09e87d29c52e158f3e51c8760fe6312",
+      "src/mav/Tasks/slack/tools.py": "555adc888641be913cd57ed18859b07a9bd0584a",
+      "src/mav/Tasks/slack/user_tasks.py": "4b6907075364ab059ded40a8291d6d8bee3f7a0d",
+      "src/mav/Tasks/task_combinator.py": "a1e9de9cf6e8f488afb797bb7887e673715bef76",
+      "src/mav/Tasks/task_suite.py": "02973ac6930452050e84d796f8f70bcae4f5bad7",
+      "src/mav/Tasks/travel/environment.py": "91fe7c7a8f38c07a6af71cbf6632b2d117500c32",
+      "src/mav/Tasks/travel/task_suite.py": "8b8d6b428b832bc04b33e72baff9f86d2e260e36",
+      "src/mav/Tasks/travel/tools.py": "dbf789dc4824208828795fce8c3d227cde75c14f",
+      "src/mav/Tasks/travel/user_tasks.py": "1667d554fe87c09d330eec2f1c3e78f1b1978af6",
+      "src/mav/Tasks/utils/yaml_loader.py": "de167db2751ef67520b06f6491b732e655b1e956",
+      "src/mav/Tasks/web/environment.py": "170a267b263989037e06c6fde62d87e3979854ea",
+      "src/mav/Tasks/workspace/environment.py": "874e9f547a13da60e284ce680df21da09e8eb52a",
+      "src/mav/Tasks/workspace/task_suite.py": "20ef8a03fafd2074b8f98af68346d0a4765ef072",
+      "src/mav/Tasks/workspace/tools.py": "ea503cd7f1ba791e70e6b4bd5bd2f60a1ee78d26",
+      "src/mav/Tasks/workspace/user_tasks.py": "be28cd929003e567ce7056e493506e66c16acaaf"
+    },
+    "selection_count": 123,
+    "selection_sha256": "2612f904cc61dde17795c1ce6e967fb2ba2bad01081e0a8b56ce0617e8be7be0",
+    "edition": "Four-domain selection from pinned repository, 30 banking/30 slack/30 travel/33 workspace",
+    "excluded_registry_ids": [
+      "pear/travel/user_task_30",
+      "pear/travel/user_task_31",
+      "pear/travel/user_task_32",
+      "pear/travel/user_task_33",
+      "pear/travel/user_task_34",
+      "pear/travel/user_task_35",
+      "pear/travel/user_task_36"
+    ]
+  }
+}

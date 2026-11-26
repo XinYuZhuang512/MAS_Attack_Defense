@@ -1,0 +1,6 @@
+{
+  "clean": {"target": "none", "source": null},
+  "tool_result": {"target": "environment_item", "source": "https://arxiv.org/abs/2406.13352"},
+  "role_prompt": {"target": "agent_configuration", "source": "https://aclanthology.org/2026.findings-eacl.237/"},
+  "delegation_message": {"target": "inter_agent_message", "source": "https://aclanthology.org/2026.findings-eacl.237/"}
+}
